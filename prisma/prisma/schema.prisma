@@ -1,0 +1,405 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "mongodb"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model User {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  email         String       @unique
+  emailVerified DateTime? // This field must exist
+  name          String?
+  image         String?
+  isBan         Boolean      @default(false)
+  isPremium     Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  userDetails   userDetails?
+  Feedback      Feedback[]
+  Playlist      Playlist[]
+  Formula       Formula[]
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model userDetails {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String  @db.ObjectId
+  branchId    String  @db.ObjectId
+  year        String
+  semester    String
+  userId      String  @unique @db.ObjectId
+  User        User    @relation(fields: [userId], references: [id])
+  isLocked    Boolean @default(false)
+  isVerified  Boolean @default(false)
+  modifyCount Int     @default(0)
+  Course      Course  @relation(fields: [courseId], references: [id])
+  Branch      Branch  @relation(fields: [branchId], references: [id])
+}
+
+enum UType {
+  Free
+  Premium
+}
+
+model Admin {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  firstName   String
+  lastName    String
+  email       String        @unique
+  password    String
+  role        Role
+  isBan       Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  InviteAdmin InviteAdmin[]
+
+  Course Course[]
+  Branch Branch[]
+
+  Subject              Subject[]
+  PdfUpload            PdfUpload[]
+  Resources            Resources[]
+  Pyqs                 Pyqs[]
+  MostRepeatedQuestion MostRepeatedQuestion[]
+}
+
+model Reset {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  token     String
+  otp       String
+  expiry    DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InviteAdmin {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  firstName         String
+  email             String    @unique
+  role              Role
+  addedBy           Admin     @relation(fields: [addedById], references: [id])
+  addedById         String    @db.ObjectId
+  activeToken       String?
+  activeTokenExpiry DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  userId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Course {
+  id                   String                 @id @default(auto()) @map("_id") @db.ObjectId
+  name                 String
+  type                 CType
+  duration             CDuration
+  addedById            String                 @db.ObjectId
+  addedBy              Admin                  @relation(fields: [addedById], references: [id])
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  Branch               Branch[]
+  ResourcesDetails     ResourcesDetails[]
+  Pyqs                 Pyqs[]
+  userDetails          userDetails[]
+  MostRepeatedQuestion MostRepeatedQuestion[]
+}
+
+model Branch {
+  id             String           @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  shortName      String
+  courseId       String           @db.ObjectId
+  addedById      String           @db.ObjectId
+  addedBy        Admin            @relation(fields: [addedById], references: [id])
+  Course         Course           @relation(fields: [courseId], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  SubjectDetails SubjectDetails[]
+  userDetails    userDetails[]
+}
+
+model Subject {
+  id                   String                 @id @default(auto()) @map("_id") @db.ObjectId
+  fullName             String
+  shortName            String
+  code                 String
+  subjectType          EsubjectType
+  credit               SubjectCredit
+  year                 SubjectYear
+  addedById            String                 @db.ObjectId
+  addedBy              Admin                  @relation(fields: [addedById], references: [id])
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  subjectDetails       SubjectDetails?
+  Resources            Resources[]
+  Pyqs                 Pyqs[]
+  MostRepeatedQuestion MostRepeatedQuestion[]
+
+  Playlist Playlist[]
+  Formula  Formula[]
+}
+
+model SubjectDetails {
+  id                    String         @id @default(auto()) @map("_id") @db.ObjectId
+  subjectId             String         @unique @db.ObjectId
+  branchId              String[]       @db.ObjectId
+  courseId              String         @db.ObjectId
+  Branch                Branch         @relation(fields: [branchId], references: [id])
+  subject               Subject        @relation(fields: [subjectId], references: [id])
+  semester              String[]
+  scheme                SubjectScheme?
+  courseHangoutUrl      String?
+  courseHangoutPublicId String?
+}
+
+model PdfUpload {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  addedById String   @db.ObjectId
+  fileName  String
+  fileUrl   String
+  encrypted Boolean  @default(true)
+  createdAt DateTime @default(now())
+  addedBy   Admin    @relation(fields: [addedById], references: [id])
+}
+
+model Resources {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  addedBy          Admin             @relation(fields: [addedById], references: [id])
+  addedById        String            @db.ObjectId
+  title            String
+  description      String
+  subject          Subject           @relation(fields: [subjectId], references: [id])
+  subjectId        String            @db.ObjectId
+  fileName         String
+  isGoogleDrive    Boolean           @default(false)
+  fileUrl          String
+  encrypted        Boolean           @default(true)
+  visibility       Visibility
+  contentType      ContentType
+  freemium         Freemium?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  ResourcesDetails ResourcesDetails?
+}
+
+model ResourcesDetails {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  resourcesId String      @unique @db.ObjectId
+  year        SubjectYear
+  courseId    String      @db.ObjectId
+  Course      Course      @relation(fields: [courseId], references: [id])
+  resources   Resources   @relation(fields: [resourcesId], references: [id])
+}
+
+model Pyqs {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  courseId      String      @db.ObjectId
+  subjectId     String      @db.ObjectId
+  addedById     String      @db.ObjectId
+  visibility    Visibility
+  pyqType       PYQTYPE
+  freemium      Freemium?
+  pyqUrl        String
+  solutionUrl   String?
+  year          SubjectYear
+  isGoogleDrive Boolean     @default(false)
+  semType       SEM_TYPE
+  Course        Course      @relation(fields: [courseId], references: [id])
+  addedBy       Admin       @relation(fields: [addedById], references: [id])
+  subject       Subject     @relation(fields: [subjectId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MostRepeatedQuestion {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  courseId   String      @db.ObjectId
+  subjectId  String      @db.ObjectId
+  addedById  String      @db.ObjectId
+  year       SubjectYear
+  // semType    SEM_TYPE
+  title      String
+  visibility Visibility
+  pyqType    PYQTYPE
+  freemium   Freemium?
+  pyqUrl     String
+  Course     Course      @relation(fields: [courseId], references: [id])
+  addedBy    Admin       @relation(fields: [addedById], references: [id])
+  subject    Subject     @relation(fields: [subjectId], references: [id])
+}
+
+model Feedback {
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String     @db.ObjectId
+  review        String
+  category      C_Feedback
+  isHighlighted Boolean    @default(false)
+  rating        Float?
+  approved      Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  user          User       @relation(fields: [userId], references: [id])
+}
+
+model Playlist {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  title      String
+  subjectId  String     @db.ObjectId
+  courseId   String     @db.ObjectId
+  addedById  String     @db.ObjectId
+  chName     String  @default("Dummy")
+  rating     Float   @default(5.6)
+  noOfVideos Int    @default(2)
+  visibility Visibility
+  link       String
+  createdAt  DateTime   @default(now())
+  subject    Subject    @relation(fields: [subjectId], references: [id])
+  user       User       @relation(fields: [addedById], references: [id])
+}
+
+model Formula {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  subjectId String   @db.ObjectId
+  fileUri   String
+  type      F_TYPE
+  userId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum F_TYPE {
+  Mid
+  End
+}
+
+enum C_Feedback {
+  Bug
+  Feedback
+  Feature
+}
+
+enum SEM_TYPE {
+  Spring
+  Autumn
+}
+
+enum PYQTYPE {
+  Mid
+  End
+  Supplement
+  Improvement
+}
+
+enum Visibility {
+  Public
+  Private
+}
+
+enum ContentType {
+  Handwritten
+  Slide
+}
+
+enum Freemium {
+  Free
+  Premium
+}
+
+enum SubjectYear {
+  One   @map("1")
+  Two   @map("2")
+  Three @map("3")
+  Four  @map("4")
+}
+
+enum EsubjectType {
+  Core
+  Elective
+  Lab
+}
+
+enum SubjectCredit {
+  One   @map("1")
+  Two   @map("2")
+  Three @map("3")
+  Four  @map("4")
+}
+
+enum SubjectScheme {
+  SchemeA @map("A")
+  SchemeB @map("B")
+}
+
+enum CType {
+  Bachelor
+  Master
+  Doctorate
+}
+
+enum CDuration {
+  TwoYears   @map("2")
+  ThreeYears @map("3")
+  FourYears  @map("4")
+  FiveYears  @map("5")
+}
+
+enum Role {
+  SuperAdmin
+  Admin
+}
